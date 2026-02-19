@@ -219,7 +219,7 @@ jobs:
             if (analysis.breakingChanges.length > 0) {
               prBody += `### ⚠️ Breaking Changes\n`;
               analysis.breakingChanges.forEach(change => {
-                prBody += `- ${change}\n`;
+                prBody += `- \`${change}\`\n`;
               });
               prBody += '\n';
             }
@@ -227,7 +227,7 @@ jobs:
             if (analysis.newFeatures.length > 0) {
               prBody += `### ✨ New Features\n`;
               analysis.newFeatures.forEach(feature => {
-                prBody += `- ${feature}\n`;
+                prBody += `- \`${feature}\`\n`;
               });
               prBody += '\n';
             }
@@ -235,7 +235,7 @@ jobs:
             if (analysis.bugFixes.length > 0) {
               prBody += `### 🐛 Improvements\n`;
               analysis.bugFixes.forEach(fix => {
-                prBody += `- ${fix}\n`;
+                prBody += `- \`${fix}\`\n`;
               });
               prBody += '\n';
             }
@@ -391,7 +391,7 @@ jobs:
             if (analysis.breakingChanges.length > 0) {
               comment += `### ⚠️ Breaking Changes\n`;
               analysis.breakingChanges.forEach(change => {
-                comment += `- ${change}\n`;
+                comment += `- \`${change}\`\n`;
               });
               comment += '\n';
             }
@@ -399,7 +399,7 @@ jobs:
             if (analysis.newFeatures.length > 0) {
               comment += `### ✨ New Features\n`;
               analysis.newFeatures.forEach(feature => {
-                comment += `- ${feature}\n`;
+                comment += `- \`${feature}\`\n`;
               });
               comment += '\n';
             }
@@ -407,7 +407,7 @@ jobs:
             if (analysis.bugFixes.length > 0) {
               comment += `### 🐛 Improvements\n`;
               analysis.bugFixes.forEach(fix => {
-                comment += `- ${fix}\n`;
+                comment += `- \`${fix}\`\n`;
               });
             }
 
