@@ -27,17 +27,46 @@ jobs:
         with:
           version: latest
 
+      - name: Find auto-generate-connector branch
+        id: find_branch
+        run: |
+          # Fetch all remote branches
+          git fetch origin
+
+          # Find all auto-generate-connector branches and sort by timestamp (if present)
+          # This will list branches like:
+          # - auto-generate-connector
+          # - auto-generate-connector-20260219-091524
+          # - auto-generate-connector-20260219-101234
+          # And pick the one with the latest timestamp
+
+          BRANCH_NAME=$(git branch -r | grep -E 'origin/auto-generate-connector' | \
+            sed 's/origin\///' | \
+            sed 's/^[[:space:]]*//' | \
+            sort -r | \
+            head -1)
+
+          if [ -z "$BRANCH_NAME" ]; then
+            echo "Error: No auto-generate-connector branch found"
+            exit 1
+          fi
+
+          echo "Found latest branch: $BRANCH_NAME"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
       - name: Generate git diff for client.bal and types.bal
         id: diff
         run: |
+          BRANCH_NAME="${{ steps.find_branch.outputs.branch_name }}"
+
           # Generate diff between main and auto-generate-connector branches
-          echo "Generating diff between origin/main and origin/auto-generate-connector..."
+          echo "Generating diff between origin/main and origin/$BRANCH_NAME..."
 
           # Generate diff for client.bal
-          git diff origin/main..origin/auto-generate-connector -- ballerina/client.bal > client_diff.txt || true
+          git diff origin/main..origin/$BRANCH_NAME -- ballerina/client.bal > client_diff.txt || true
 
           # Generate diff for types.bal
-          git diff origin/main..origin/auto-generate-connector -- ballerina/types.bal > types_diff.txt || true
+          git diff origin/main..origin/$BRANCH_NAME -- ballerina/types.bal > types_diff.txt || true
 
           # Combine diffs
           cat client_diff.txt types_diff.txt > git_diff.txt
@@ -86,11 +115,13 @@ jobs:
         if: steps.diff.outputs.has_changes == 'true'
         id: update_version
         run: |
+          BRANCH_NAME="${{ steps.find_branch.outputs.branch_name }}"
+
           # Stash any existing changes first
           git stash || true
 
           # Checkout the auto-generate-connector branch
-          git checkout auto-generate-connector
+          git checkout $BRANCH_NAME
 
           # Read the analysis result
           CHANGE_TYPE=$(jq -r '.changeType' analysis_result.json)
@@ -164,6 +195,8 @@ jobs:
       - name: Commit version changes and generated files
         if: steps.diff.outputs.has_changes == 'true'
         run: |
+          BRANCH_NAME="${{ steps.find_branch.outputs.branch_name }}"
+
           git config --local user.email "ballerina-bot@ballerina.io"
           git config --local user.name "ballerina-bot"
 
@@ -191,7 +224,7 @@ jobs:
             git commit -m "$COMMIT_MSG"
           fi
 
-          git push origin auto-generate-connector
+          git push origin $BRANCH_NAME
 
       - name: Create Pull Request
         if: steps.diff.outputs.has_changes == 'true'
@@ -203,6 +236,7 @@ jobs:
             const fs = require('fs');
             const analysis = JSON.parse(fs.readFileSync('analysis_result.json', 'utf8'));
             const gradleBuildFailed = '${{ steps.gradle_build.outcome }}' === 'failure';
+            const branchName = '${{ steps.find_branch.outputs.branch_name }}';
 
             let prBody = `## 📊 Version Change Analysis\n\n`;
 
@@ -252,7 +286,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `${buildStatus}[${analysis.changeType}] Auto-generated connector update - v${{ steps.update_version.outputs.new_version }}`,
-              head: 'auto-generate-connector',
+              head: branchName,
               base: 'main',
               body: prBody
             });
@@ -299,6 +333,7 @@ jobs:
             Version Analysis Complete
             ${{ steps.gradle_build.outcome == 'failure' && '\n⚠️ WARNING: GRADLE BUILD FAILED - Manual intervention required!\n' || '' }}
             Repository: ${{ github.repository }}
+            Branch: ${{ steps.find_branch.outputs.branch_name }}
             Change Type: ${{ steps.update_version.outputs.change_type }}
             New Version: ${{ steps.update_version.outputs.new_version }}
             Build Status: ${{ steps.gradle_build.outcome == 'failure' && 'FAILED ❌' || 'Success ✅' }}
@@ -339,6 +374,7 @@ jobs:
                 <div class="content">
                   ${{ steps.gradle_build.outcome == 'failure' && '<div class="warning-box"><strong>⚠️ GRADLE BUILD FAILED</strong><br>The Gradle build step failed. Manual intervention is required to fix the build issues before merging.</div>' || '' }}
                   <p><strong>Repository:</strong> ${{ github.repository }}</p>
+                  <p><strong>Branch:</strong> ${{ steps.find_branch.outputs.branch_name }}</p>
                   <p><strong>Change Type:</strong> <span class="badge ${{ steps.update_version.outputs.change_type == 'MAJOR' && 'major' || steps.update_version.outputs.change_type == 'MINOR' && 'minor' || 'patch' }}">${{ steps.update_version.outputs.change_type }}</span></p>
                   <p><strong>New Version:</strong> ${{ steps.update_version.outputs.new_version }}</p>
                   <p><strong>Build Status:</strong> <span class="badge ${{ steps.gradle_build.outcome == 'failure' && 'build-failed' || 'build-success' }}">${{ steps.gradle_build.outcome == 'failure' && 'FAILED ❌' || 'Success ✅' }}</span></p>
