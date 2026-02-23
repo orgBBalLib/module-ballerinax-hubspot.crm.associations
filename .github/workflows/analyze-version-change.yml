@@ -30,16 +30,7 @@ jobs:
       - name: Find auto-generate-connector branch
         id: find_branch
         run: |
-          # Fetch all remote branches
           git fetch origin
-
-          # Find all auto-generate-connector branches and sort by timestamp (if present)
-          # This will list branches like:
-          # - auto-generate-connector
-          # - auto-generate-connector-20260219-091524
-          # - auto-generate-connector-20260219-101234
-          # And pick the one with the latest timestamp
-
           BRANCH_NAME=$(git branch -r | grep -E 'origin/auto-generate-connector' | \
             sed 's/origin\///' | \
             sed 's/^[[:space:]]*//' | \
@@ -58,20 +49,12 @@ jobs:
         id: diff
         run: |
           BRANCH_NAME="${{ steps.find_branch.outputs.branch_name }}"
-
-          # Generate diff between main and auto-generate-connector branches
           echo "Generating diff between origin/main and origin/$BRANCH_NAME..."
 
-          # Generate diff for client.bal
           git diff origin/main..origin/$BRANCH_NAME -- ballerina/client.bal > client_diff.txt || true
-
-          # Generate diff for types.bal
           git diff origin/main..origin/$BRANCH_NAME -- ballerina/types.bal > types_diff.txt || true
-
-          # Combine diffs
           cat client_diff.txt types_diff.txt > git_diff.txt
 
-          # Check if diff is not empty
           if [ ! -s git_diff.txt ]; then
             echo "No changes detected in client.bal or types.bal"
             echo "has_changes=false" >> $GITHUB_OUTPUT
@@ -84,19 +67,12 @@ jobs:
           echo "Types diff size: $(wc -c < types_diff.txt) bytes"
           echo "Combined diff size: $(wc -c < git_diff.txt) bytes"
 
-          # Show first 100 lines of diff for debugging
-          echo "--- First 100 lines of diff ---"
-          head -100 git_diff.txt
-
       - name: Run analysis
         if: steps.diff.outputs.has_changes == 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          # Read the diff content
           DIFF_CONTENT=$(cat git_diff.txt)
-
-          # Run the Ballerina analysis script
           cd scripts
           bal run analyze_version_change.bal -- "$DIFF_CONTENT"
           mv analysis_result.json ../
@@ -116,27 +92,16 @@ jobs:
         id: update_version
         run: |
           BRANCH_NAME="${{ steps.find_branch.outputs.branch_name }}"
-
-          # Stash any existing changes first
           git stash || true
-
-          # Checkout the auto-generate-connector branch
           git checkout $BRANCH_NAME
 
-          # Read the analysis result
           CHANGE_TYPE=$(jq -r '.changeType' analysis_result.json)
-
-          # Get current version from gradle.properties
           CURRENT_VERSION=$(grep '^version=' gradle.properties | cut -d'=' -f2)
           echo "Current version: $CURRENT_VERSION"
 
-          # Remove -SNAPSHOT suffix if present
           BASE_VERSION=$(echo $CURRENT_VERSION | sed 's/-SNAPSHOT//')
-
-          # Split version into major.minor.patch
           IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
 
-          # Increment based on change type
           case $CHANGE_TYPE in
             MAJOR)
               MAJOR=$((MAJOR + 1))
@@ -156,14 +121,11 @@ jobs:
               ;;
           esac
 
-          # Create new version with -SNAPSHOT suffix
           NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-SNAPSHOT"
           echo "New version: $NEW_VERSION"
 
-          # Update gradle.properties
           sed -i "s/^version=.*/version=$NEW_VERSION/" gradle.properties
 
-          # Output for later steps
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "change_type=$CHANGE_TYPE" >> $GITHUB_OUTPUT
 
@@ -182,28 +144,19 @@ jobs:
           packageUser: ${{ github.actor }}
           packagePAT: ${{ secrets.PAT_TOKEN }}
         run: |
-          # Run Gradle build which will use build-config/resources/Ballerina.toml
-          # and generate the correct Ballerina.toml and Dependencies.toml in ballerina/ folder
           ./gradlew build -x test
-
           echo "Generated Ballerina files:"
           ls -la ballerina/Ballerina.toml ballerina/Dependencies.toml || true
-
-          echo "--- Ballerina.toml content ---"
-          cat ballerina/Ballerina.toml || true
 
       - name: Commit version changes and generated files
         if: steps.diff.outputs.has_changes == 'true'
         run: |
           BRANCH_NAME="${{ steps.find_branch.outputs.branch_name }}"
-
           git config --local user.email "ballerina-bot@ballerina.io"
           git config --local user.name "ballerina-bot"
 
-          # Add gradle.properties
           git add gradle.properties
 
-          # Add generated Ballerina files only if they exist (Gradle build may have failed)
           if [ -f ballerina/Ballerina.toml ]; then
             git add ballerina/Ballerina.toml
           fi
@@ -211,7 +164,6 @@ jobs:
             git add ballerina/Dependencies.toml
           fi
 
-          # Check if there are changes to commit
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
@@ -238,49 +190,94 @@ jobs:
             const gradleBuildFailed = '${{ steps.gradle_build.outcome }}' === 'failure';
             const branchName = '${{ steps.find_branch.outputs.branch_name }}';
 
-            let prBody = `## 📊 Version Change Analysis\n\n`;
+            // Helper function to format change items with better code highlighting
+            function formatChange(change) {
+              // Pattern to match common change descriptions
+              // Example: "Method signature changed for 'post associations/[string fromObjectType]/[string toObjectType]/batch/archive' - return type changed from 'error?' to 'BatchResponseVoid|error'"
+
+              // Try to split on common patterns like " - " or ": "
+              const separators = [' - ', ': ', ' – '];
+              let separator = null;
+              let splitIndex = -1;
+
+              for (const sep of separators) {
+                const idx = change.indexOf(sep);
+                if (idx > -1) {
+                  separator = sep;
+                  splitIndex = idx;
+                  break;
+                }
+              }
+
+              if (splitIndex > -1) {
+                // Split into description and details
+                const description = change.substring(0, splitIndex);
+                const details = change.substring(splitIndex + separator.length);
+
+                // Check if description contains code (quotes or specific patterns)
+                const descHasCode = description.includes("'") || description.includes('"') || description.includes('`');
+
+                if (descHasCode) {
+                  // Extract code parts from description
+                  const descFormatted = description.replace(/'([^']+)'/g, '`$1`').replace(/"([^"]+)"/g, '`$1`');
+                  return `${descFormatted} - ${details}`;
+                } else {
+                  // Description is plain text, details might be code
+                  return `${description} - \`${details}\``;
+                }
+              }
+
+              // Fallback: if it contains quotes, format those as code
+              if (change.includes("'") || change.includes('"')) {
+                return change.replace(/'([^']+)'/g, '`$1`').replace(/"([^"]+)"/g, '`$1`');
+              }
+
+              // Otherwise return as-is
+              return change;
+            }
+
+            let prBody = `## Version Change Analysis\n\n`;
 
             if (gradleBuildFailed) {
-              prBody += `> ⚠️ **GRADLE BUILD FAILED** - The Gradle build step failed during this workflow run. Manual intervention is required to fix the build issues before merging this PR.\n\n`;
+              prBody += `> WARNING: GRADLE BUILD FAILED - The Gradle build step failed during this workflow run. Manual intervention is required to fix the build issues before merging this PR.\n\n`;
             }
 
             prBody += `**Recommended Version Bump:** \`${analysis.changeType}\`\n`;
             prBody += `**New Version:** \`${{ steps.update_version.outputs.new_version }}\`\n`;
             prBody += `**Confidence:** ${analysis.confidence}\n`;
-            prBody += `**Build Status:** ${gradleBuildFailed ? '❌ Failed' : '✅ Success'}\n\n`;
+            prBody += `**Build Status:** ${gradleBuildFailed ? 'FAILED' : 'Success'}\n\n`;
             prBody += `### Summary\n${analysis.summary}\n\n`;
 
             if (analysis.breakingChanges.length > 0) {
-              prBody += `### ⚠️ Breaking Changes\n`;
+              prBody += `### Breaking Changes\n`;
               analysis.breakingChanges.forEach(change => {
-                prBody += `- \`${change}\`\n`;
+                prBody += `- ${formatChange(change)}\n`;
               });
               prBody += '\n';
             }
 
             if (analysis.newFeatures.length > 0) {
-              prBody += `### ✨ New Features\n`;
+              prBody += `### New Features\n`;
               analysis.newFeatures.forEach(feature => {
-                prBody += `- \`${feature}\`\n`;
+                prBody += `- ${formatChange(feature)}\n`;
               });
               prBody += '\n';
             }
 
             if (analysis.bugFixes.length > 0) {
-              prBody += `### 🐛 Improvements\n`;
+              prBody += `### Improvements\n`;
               analysis.bugFixes.forEach(fix => {
-                prBody += `- \`${fix}\`\n`;
+                prBody += `- ${formatChange(fix)}\n`;
               });
               prBody += '\n';
             }
 
             prBody += `---\n\n`;
             if (gradleBuildFailed) {
-              prBody += `🚨 **BUILD FAILED** - Please fix the Gradle build errors before merging.\n`;
+              prBody += `BUILD FAILED - Please fix the Gradle build errors before merging.\n`;
             }
-            prBody += `🔍 **Manual Review Required** - Please review the changes and approve if appropriate.\n`;
+            prBody += `Manual Review Required - Please review the changes and approve if appropriate.\n`;
 
-            // Create PR with build status in title
             const buildStatus = gradleBuildFailed ? '[BUILD FAILED] ' : '';
             const pr = await github.rest.pulls.create({
               owner: context.repo.owner,
@@ -317,80 +314,31 @@ jobs:
               labels: labels
             });
 
-      - name: Send email notification
+      - name: Save connector update info for daily summary
         if: steps.diff.outputs.has_changes == 'true'
-        uses: dawidd6/action-send-mail@v3
+        run: |
+          cat > connector_update.json <<EOF
+          {
+            "repository": "${{ github.repository }}",
+            "branch": "${{ steps.find_branch.outputs.branch_name }}",
+            "changeType": "${{ steps.update_version.outputs.change_type }}",
+            "newVersion": "${{ steps.update_version.outputs.new_version }}",
+            "buildStatus": "${{ steps.gradle_build.outcome }}",
+            "prNumber": "${{ steps.create_pr.outputs.pr_number }}",
+            "prUrl": "${{ steps.create_pr.outputs.pr_url }}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+          echo "Connector update info saved"
+          cat connector_update.json
+
+      - name: Upload connector update info
+        if: steps.diff.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v4
         with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.GMAIL_USERNAME }}
-          password: ${{ secrets.GMAIL_APP_PASSWORD }}
-          subject: "${{ steps.gradle_build.outcome == 'failure' && '🚨 BUILD FAILED - ' || '🔔 ' }}Version Analysis Complete - ${{ steps.update_version.outputs.change_type }} Update Required"
-          to: t37714687@gmail.com
-          from: ${{ secrets.GMAIL_USERNAME }}
-          body: |
-            Version Analysis Complete
-            ${{ steps.gradle_build.outcome == 'failure' && '\n⚠️ WARNING: GRADLE BUILD FAILED - Manual intervention required!\n' || '' }}
-            Repository: ${{ github.repository }}
-            Branch: ${{ steps.find_branch.outputs.branch_name }}
-            Change Type: ${{ steps.update_version.outputs.change_type }}
-            New Version: ${{ steps.update_version.outputs.new_version }}
-            Build Status: ${{ steps.gradle_build.outcome == 'failure' && 'FAILED ❌' || 'Success ✅' }}
-
-            Pull Request: ${{ steps.create_pr.outputs.pr_url }}
-
-            Summary:
-            ${{ steps.display_results.outputs.summary }}
-            ${{ steps.gradle_build.outcome == 'failure' && '\n⚠️ Please fix the Gradle build errors before merging the PR.\n' || '' }}
-            Please review the PR for detailed changes.
-
-            This is an automated message from GitHub Actions.
-          html_body: |
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                .header { background-color: ${{ steps.gradle_build.outcome == 'failure' && '#d73a49' || '#0366d6' }}; color: white; padding: 20px; border-radius: 5px; }
-                .content { background-color: #f6f8fa; padding: 20px; margin-top: 20px; border-radius: 5px; }
-                .badge { display: inline-block; padding: 5px 10px; border-radius: 3px; font-weight: bold; }
-                .major { background-color: #d73a49; color: white; }
-                .minor { background-color: #0366d6; color: white; }
-                .patch { background-color: #28a745; color: white; }
-                .build-failed { background-color: #d73a49; color: white; }
-                .build-success { background-color: #28a745; color: white; }
-                .warning-box { background-color: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 5px; margin: 15px 0; }
-                .button { display: inline-block; padding: 10px 20px; background-color: #0366d6; color: white; text-decoration: none; border-radius: 5px; margin-top: 15px; }
-                .footer { margin-top: 20px; font-size: 12px; color: #666; }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <div class="header">
-                  <h2>${{ steps.gradle_build.outcome == 'failure' && '🚨 BUILD FAILED - ' || '📊 ' }}Version Analysis Complete</h2>
-                </div>
-                <div class="content">
-                  ${{ steps.gradle_build.outcome == 'failure' && '<div class="warning-box"><strong>⚠️ GRADLE BUILD FAILED</strong><br>The Gradle build step failed. Manual intervention is required to fix the build issues before merging.</div>' || '' }}
-                  <p><strong>Repository:</strong> ${{ github.repository }}</p>
-                  <p><strong>Branch:</strong> ${{ steps.find_branch.outputs.branch_name }}</p>
-                  <p><strong>Change Type:</strong> <span class="badge ${{ steps.update_version.outputs.change_type == 'MAJOR' && 'major' || steps.update_version.outputs.change_type == 'MINOR' && 'minor' || 'patch' }}">${{ steps.update_version.outputs.change_type }}</span></p>
-                  <p><strong>New Version:</strong> ${{ steps.update_version.outputs.new_version }}</p>
-                  <p><strong>Build Status:</strong> <span class="badge ${{ steps.gradle_build.outcome == 'failure' && 'build-failed' || 'build-success' }}">${{ steps.gradle_build.outcome == 'failure' && 'FAILED ❌' || 'Success ✅' }}</span></p>
-
-                  <p>A pull request has been created for your review:</p>
-                  <a href="${{ steps.create_pr.outputs.pr_url }}" class="button">View Pull Request</a>
-
-                  <p style="margin-top: 20px;"><strong>${{ steps.gradle_build.outcome == 'failure' && '🚨 BUILD FAILED - Fix Required' || '⚠️ Manual Review Required' }}</strong><br>
-                  ${{ steps.gradle_build.outcome == 'failure' && 'Please fix the Gradle build errors before merging this PR.' || 'Please review the changes carefully before merging.' }}</p>
-                </div>
-                <div class="footer">
-                  <p>This is an automated message from GitHub Actions.</p>
-                </div>
-              </div>
-            </body>
-            </html>
+          name: connector-update-${{ github.repository_owner }}-${{ github.event.repository.name }}-${{ github.run_id }}
+          path: connector_update.json
 
       - name: Upload analysis results
         if: steps.diff.outputs.has_changes == 'true'
@@ -402,58 +350,3 @@ jobs:
             git_diff.txt
             client_diff.txt
             types_diff.txt
-
-      - name: Comment on PR (for repository_dispatch events)
-        if: github.event_name == 'repository_dispatch' && steps.diff.outputs.has_changes == 'true'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.PAT_TOKEN }}
-          script: |
-            const fs = require('fs');
-
-            if (!fs.existsSync('analysis_result.json')) {
-              console.log('No analysis result found');
-              return;
-            }
-
-            const analysis = JSON.parse(fs.readFileSync('analysis_result.json', 'utf8'));
-
-            let comment = `## 📊 Version Change Analysis\n\n`;
-            comment += `**Recommended Version Bump:** \`${analysis.changeType}\`\n`;
-            comment += `**New Version:** \`${{ steps.update_version.outputs.new_version }}\`\n`;
-            comment += `**Confidence:** ${analysis.confidence}\n\n`;
-            comment += `### Summary\n${analysis.summary}\n\n`;
-
-            if (analysis.breakingChanges.length > 0) {
-              comment += `### ⚠️ Breaking Changes\n`;
-              analysis.breakingChanges.forEach(change => {
-                comment += `- \`${change}\`\n`;
-              });
-              comment += '\n';
-            }
-
-            if (analysis.newFeatures.length > 0) {
-              comment += `### ✨ New Features\n`;
-              analysis.newFeatures.forEach(feature => {
-                comment += `- \`${feature}\`\n`;
-              });
-              comment += '\n';
-            }
-
-            if (analysis.bugFixes.length > 0) {
-              comment += `### 🐛 Improvements\n`;
-              analysis.bugFixes.forEach(fix => {
-                comment += `- \`${fix}\`\n`;
-              });
-            }
-
-            const prNumber = context.payload.client_payload?.pr_number;
-
-            if (prNumber) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: comment
-              });
-            }
