@@ -20,13 +20,13 @@ type AnalysisResult record {
 
 function analyzeWithAnthropic(string gitDiff) returns AnalysisResult|error {
     string apiKey = os:getEnv("ANTHROPIC_API_KEY");
-    
+
     if apiKey == "" {
         return error("ANTHROPIC_API_KEY environment variable is not set");
     }
-    
-    io:println(string `🔑 Using Anthropic API (${apiKey.length()} chars)`);
-    
+
+    io:println(string `Using Anthropic API (${apiKey.length()} chars)`);
+
     string prompt = string `You are analyzing git diff output for a Ballerina connector to determine the semantic version change needed.
 
 GIT DIFF:
@@ -51,129 +51,129 @@ Analyze the diff and respond with ONLY a JSON object (no markdown, no explanatio
         httpVersion: http:HTTP_1_1,
         timeout: 60
     });
-    
+
     json payload = {
         "model": "claude-sonnet-4-20250514",
         "max_tokens": 1024,
         "temperature": 0.1,
         "messages": [{"role": "user", "content": prompt}]
     };
-    
+
     http:Request req = new;
     req.setJsonPayload(payload);
     req.setHeader("anthropic-version", "2023-06-01");
     req.setHeader("x-api-key", apiKey);
     req.setHeader("content-type", "application/json");
-    
-    io:println("📤 Sending request to Anthropic API...");
-    
+
+    io:println("Sending request to Anthropic API...");
+
     json response = {};
     int retryCount = 0;
     boolean success = false;
-    
+
     while !success && retryCount < MAX_RETRIES {
         do {
             http:Response httpResponse = check anthropicClient->post("/v1/messages", req);
             int statusCode = httpResponse.statusCode;
-            io:println(string `📥 Response status: ${statusCode}`);
-            
+            io:println(string `Response status: ${statusCode}`);
+
             string textResult = check httpResponse.getTextPayload();
-            
+
             if statusCode != 200 {
-                io:println(string `⚠️ Response: ${textResult}`);
+                io:println(string `Response: ${textResult}`);
                 if statusCode == 429 {
                     retryCount = retryCount + 1;
                     if retryCount < MAX_RETRIES {
-                        io:println(string `⏳ Rate limited. Retry ${retryCount}/${MAX_RETRIES} in ${RETRY_DELAY_SECONDS}s...`);
+                        io:println(string `Rate limited. Retry ${retryCount}/${MAX_RETRIES} in ${RETRY_DELAY_SECONDS}s...`);
                         runtime:sleep(RETRY_DELAY_SECONDS);
                         continue;
                     }
                 }
                 return error(string `Anthropic API returned status ${statusCode}: ${textResult}`);
             }
-            
+
             response = check value:fromJsonString(textResult);
-            
+
             // Check for API errors
             json|error errorCheck = response.'error;
             if errorCheck is json {
                 string errorMsg = check errorCheck.message;
                 return error(string `Anthropic API Error: ${errorMsg}`);
             }
-            
+
             success = true;
-            
+
         } on fail error e {
             retryCount = retryCount + 1;
             if retryCount < MAX_RETRIES {
-                io:println(string `⏳ Request failed. Retry ${retryCount}/${MAX_RETRIES} in ${RETRY_DELAY_SECONDS}s...`);
+                io:println(string `Request failed. Retry ${retryCount}/${MAX_RETRIES} in ${RETRY_DELAY_SECONDS}s...`);
                 runtime:sleep(RETRY_DELAY_SECONDS);
             } else {
                 return e;
             }
         }
     }
-    
+
     json contentJson = check response.content;
     json[] content = check contentJson.ensureType();
     string text = check content[0].text;
-    
-    io:println(string `🔍 Extracted text: ${text}`);
-    
+
+    io:println(string `Extracted text: ${text}`);
+
     text = regex:replaceAll(text.trim(), "```json|```", "");
     return check value:fromJsonStringWithType(text.trim());
 }
 
 public function main(string gitDiffContent) returns error? {
-    
-    io:println("📊 Analyzing git diff...");
-    io:println(string `📏 Diff size: ${gitDiffContent.length()} chars`);
-    
+
+    io:println("Analyzing git diff...");
+    io:println(string `Diff size: ${gitDiffContent.length()} chars`);
+
     if gitDiffContent.length() == 0 {
         return error("Git diff content is empty");
     }
-    
-    io:println("🤖 Analyzing with Claude...");
-    
+
+    io:println("Analyzing with Claude...");
+
     AnalysisResult analysis = check analyzeWithAnthropic(gitDiffContent);
-    
+
     // Output results
     io:println("\n" + repeatString("=", 60));
-    io:println("📋 VERSION CHANGE ANALYSIS");
+    io:println("VERSION CHANGE ANALYSIS");
     io:println(repeatString("=", 60));
     io:println(string `
-🔖 Version Bump: ${analysis.changeType}
-✅ Confidence: ${analysis.confidence}
+Version Bump: ${analysis.changeType}
+Confidence: ${analysis.confidence}
 
-📝 Summary:
+Summary:
 ${analysis.summary}`);
-    
+
     if analysis.breakingChanges.length() > 0 {
-        io:println("\n⚠️  BREAKING CHANGES:");
+        io:println("\nBREAKING CHANGES:");
         foreach string change in analysis.breakingChanges {
             io:println(string `  - ${change}`);
         }
     }
-    
+
     if analysis.newFeatures.length() > 0 {
-        io:println("\n✨ NEW FEATURES:");
+        io:println("\nNEW FEATURES:");
         foreach string feature in analysis.newFeatures {
             io:println(string `  - ${feature}`);
         }
     }
-    
+
     if analysis.bugFixes.length() > 0 {
-        io:println("\n🐛 IMPROVEMENTS:");
+        io:println("\nIMPROVEMENTS:");
         foreach string fix in analysis.bugFixes {
             io:println(string `  - ${fix}`);
         }
     }
-    
+
     io:println("\n" + repeatString("=", 60));
-    
+
     json resultJson = check analysis.cloneWithType(json);
     check io:fileWriteJson("analysis_result.json", resultJson);
-    io:println("\n💾 Saved to: analysis_result.json");
+    io:println("\nSaved to: analysis_result.json");
 }
 
 function repeatString(string s, int n) returns string {

@@ -202,7 +202,7 @@ function sortAndWrite(string inputPath, string outputPath) returns error? {
     if methodBlocks.length() == 0 {
         // No methods found, just copy the file
         check io:fileWriteString(outputPath, content);
-        io:println("⚠️ No resource methods found, file copied as-is");
+        io:println("No resource methods found, file copied as-is");
         return;
     }
 
@@ -253,8 +253,8 @@ function sortAndWrite(string inputPath, string outputPath) returns error? {
 
     check io:fileWriteString(outputPath, string:'join("\n", ...outputLines));
 
-    io:println(string `✅ Sorted ${methods.length()} resource methods`);
-    io:println(string `📝 Written to: ${outputPath}`);
+    io:println(string `Sorted ${methods.length()} resource methods`);
+    io:println(string `Written to: ${outputPath}`);
 }
 
 public function main(string[] args) returns error? {
@@ -267,7 +267,7 @@ public function main(string[] args) returns error? {
     string outputFile = args[1];
 
     if !check file:test(inputFile, file:EXISTS) {
-        io:println(string `❌ Input file not found: ${inputFile}`);
+        io:println(string `Input file not found: ${inputFile}`);
         return error("Input file not found");
     }
 
