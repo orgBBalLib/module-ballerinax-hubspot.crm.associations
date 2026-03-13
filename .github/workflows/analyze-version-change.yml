@@ -63,9 +63,6 @@ jobs:
 
           echo "has_changes=true" >> $GITHUB_OUTPUT
           echo "Diff generated successfully"
-          echo "Client diff size: $(wc -c < client_diff.txt) bytes"
-          echo "Types diff size: $(wc -c < types_diff.txt) bytes"
-          echo "Combined diff size: $(wc -c < git_diff.txt) bytes"
 
       - name: Run analysis
         if: steps.diff.outputs.has_changes == 'true'
@@ -129,6 +126,54 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "change_type=$CHANGE_TYPE" >> $GITHUB_OUTPUT
 
+      - name: Clone update_changelog script from ballerina-library
+        if: steps.diff.outputs.has_changes == 'true'
+        run: |
+          git clone -b main https://github.com/orgBBalLib/ballerina-library.git temp-library
+          cp temp-library/connector_scripts/update_changelog.bal ./
+          rm -rf temp-library
+          echo "Copied update_changelog.bal from ballerina-library/connector_scripts"
+
+      - name: Update CHANGELOG.md
+        if: steps.diff.outputs.has_changes == 'true'
+        run: |
+          # Extract PR-like description from analysis
+          SUMMARY=$(jq -r '.summary' analysis_result.json)
+          BREAKING=$(jq -r '.breakingChanges[]' analysis_result.json 2>/dev/null || echo "")
+          FEATURES=$(jq -r '.newFeatures[]' analysis_result.json 2>/dev/null || echo "")
+          FIXES=$(jq -r '.bugFixes[]' analysis_result.json 2>/dev/null || echo "")
+
+          # Build PR description format
+          PR_DESC="### Summary
+          $SUMMARY
+
+          ### Breaking Changes
+          $BREAKING
+
+          ### New Features
+          $FEATURES
+
+          ### Improvements
+          $FIXES"
+
+          echo "$PR_DESC" > pr_description.txt
+
+          # Run changelog updater (from root directory where we copied it)
+          bal run update_changelog.bal -- "$(cat pr_description.txt)"
+
+      - name: Extract code owners
+        if: steps.diff.outputs.has_changes == 'true'
+        id: extract_owners
+        run: |
+          if [ -f ".github/CODEOWNERS" ]; then
+            OWNERS=$(grep -E '^\*' .github/CODEOWNERS | sed 's/^\*[[:space:]]*//' | tr -d '@' | tr ' ' ',' || echo "")
+            echo "code_owners=$OWNERS" >> $GITHUB_OUTPUT
+            echo "Found code owners: $OWNERS"
+          else
+            echo "code_owners=" >> $GITHUB_OUTPUT
+            echo "No CODEOWNERS file found"
+          fi
+
       - name: Set up Java
         if: steps.diff.outputs.has_changes == 'true'
         uses: actions/setup-java@v4
@@ -155,8 +200,13 @@ jobs:
           git config --local user.email "ballerina-bot@ballerina.io"
           git config --local user.name "ballerina-bot"
 
+          # Add version file
           git add gradle.properties
 
+          # Add any CHANGELOG files (case-insensitive)
+          git add CHANGELOG.md Changelog.md changelog.md ChangeLog.md 2>/dev/null || true
+
+          # Add generated Ballerina files if they exist
           if [ -f ballerina/Ballerina.toml ]; then
             git add ballerina/Ballerina.toml
           fi
@@ -164,10 +214,13 @@ jobs:
             git add ballerina/Dependencies.toml
           fi
 
+          # Clean up temporary files
+          rm -f update_changelog.bal pr_description.txt
+
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            COMMIT_MSG="Update version to ${{ steps.update_version.outputs.new_version }}"
+            COMMIT_MSG="Update version to ${{ steps.update_version.outputs.new_version }} and update CHANGELOG"
             if [ "${{ steps.gradle_build.outcome }}" == "failure" ]; then
               COMMIT_MSG="$COMMIT_MSG [Gradle build failed - manual intervention required]"
             else
@@ -189,13 +242,9 @@ jobs:
             const analysis = JSON.parse(fs.readFileSync('analysis_result.json', 'utf8'));
             const gradleBuildFailed = '${{ steps.gradle_build.outcome }}' === 'failure';
             const branchName = '${{ steps.find_branch.outputs.branch_name }}';
+            const codeOwners = '${{ steps.extract_owners.outputs.code_owners }}';
 
-            // Helper function to format change items with better code highlighting
             function formatChange(change) {
-              // Pattern to match common change descriptions
-              // Example: "Method signature changed for 'post associations/[string fromObjectType]/[string toObjectType]/batch/archive' - return type changed from 'error?' to 'BatchResponseVoid|error'"
-
-              // Try to split on common patterns like " - " or ": "
               const separators = [' - ', ': ', ' – '];
               let separator = null;
               let splitIndex = -1;
@@ -210,43 +259,41 @@ jobs:
               }
 
               if (splitIndex > -1) {
-                // Split into description and details
                 const description = change.substring(0, splitIndex);
                 const details = change.substring(splitIndex + separator.length);
-
-                // Check if description contains code (quotes or specific patterns)
                 const descHasCode = description.includes("'") || description.includes('"') || description.includes('`');
 
                 if (descHasCode) {
-                  // Extract code parts from description
                   const descFormatted = description.replace(/'([^']+)'/g, '`$1`').replace(/"([^"]+)"/g, '`$1`');
                   return `${descFormatted} - ${details}`;
                 } else {
-                  // Description is plain text, details might be code
                   return `${description} - \`${details}\``;
                 }
               }
 
-              // Fallback: if it contains quotes, format those as code
               if (change.includes("'") || change.includes('"')) {
                 return change.replace(/'([^']+)'/g, '`$1`').replace(/"([^"]+)"/g, '`$1`');
               }
 
-              // Otherwise return as-is
               return change;
             }
 
             let prBody = `## Version Change Analysis\n\n`;
 
             if (gradleBuildFailed) {
-              prBody += `> WARNING: GRADLE BUILD FAILED - The Gradle build step failed during this workflow run. Manual intervention is required to fix the build issues before merging this PR.\n\n`;
+              prBody += `> ⚠️ WARNING: GRADLE BUILD FAILED - Manual intervention required\n\n`;
             }
 
             prBody += `**Recommended Version Bump:** \`${analysis.changeType}\`\n`;
             prBody += `**New Version:** \`${{ steps.update_version.outputs.new_version }}\`\n`;
             prBody += `**Confidence:** ${analysis.confidence}\n`;
-            prBody += `**Build Status:** ${gradleBuildFailed ? 'FAILED' : 'Success'}\n\n`;
-            prBody += `### Summary\n${analysis.summary}\n\n`;
+            prBody += `**Build Status:** ${gradleBuildFailed ? '❌ FAILED' : '✅ Success'}\n`;
+
+            if (codeOwners) {
+              prBody += `**Code Owners:** ${codeOwners.split(',').map(o => `@${o}`).join(', ')}\n`;
+            }
+
+            prBody += `\n### Summary\n${analysis.summary}\n\n`;
 
             if (analysis.breakingChanges.length > 0) {
               prBody += `### Breaking Changes\n`;
@@ -274,8 +321,9 @@ jobs:
 
             prBody += `---\n\n`;
             if (gradleBuildFailed) {
-              prBody += `BUILD FAILED - Please fix the Gradle build errors before merging.\n`;
+              prBody += `⚠️ BUILD FAILED - Please fix the Gradle build errors before merging.\n`;
             }
+            prBody += `**CHANGELOG.md** has been automatically updated.\n\n`;
             prBody += `Manual Review Required - Please review the changes and approve if appropriate.\n`;
 
             const buildStatus = gradleBuildFailed ? '[BUILD FAILED] ' : '';
@@ -291,6 +339,7 @@ jobs:
             console.log(`Created PR #${pr.data.number}`);
             core.setOutput('pr_number', pr.data.number);
             core.setOutput('pr_url', pr.data.html_url);
+            core.setOutput('pr_title', pr.data.title);
 
             return pr.data.number;
 
@@ -313,32 +362,6 @@ jobs:
               issue_number: ${{ steps.create_pr.outputs.result }},
               labels: labels
             });
-
-      - name: Save connector update info for daily summary
-        if: steps.diff.outputs.has_changes == 'true'
-        run: |
-          cat > connector_update.json <<EOF
-          {
-            "repository": "${{ github.repository }}",
-            "branch": "${{ steps.find_branch.outputs.branch_name }}",
-            "changeType": "${{ steps.update_version.outputs.change_type }}",
-            "newVersion": "${{ steps.update_version.outputs.new_version }}",
-            "buildStatus": "${{ steps.gradle_build.outcome }}",
-            "prNumber": "${{ steps.create_pr.outputs.pr_number }}",
-            "prUrl": "${{ steps.create_pr.outputs.pr_url }}",
-            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          }
-          EOF
-
-          echo "Connector update info saved"
-          cat connector_update.json
-
-      - name: Upload connector update info
-        if: steps.diff.outputs.has_changes == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: connector-update-${{ github.repository_owner }}-${{ github.event.repository.name }}-${{ github.run_id }}
-          path: connector_update.json
 
       - name: Upload analysis results
         if: steps.diff.outputs.has_changes == 'true'
