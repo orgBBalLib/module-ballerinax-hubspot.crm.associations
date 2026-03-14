@@ -273,8 +273,8 @@ jobs:
           echo "Staged files:"
           git diff --staged --name-only
 
-          # Clean up temporary files
-          rm -f update_changelog.bal pr_description.txt analysis_result.json git_diff.txt client_diff.txt types_diff.txt
+          # Clean up temporary files EXCEPT analysis_result.json (needed for PR creation)
+          rm -f update_changelog.bal pr_description.txt git_diff.txt client_diff.txt types_diff.txt
 
           if git diff --staged --quiet; then
             echo "No changes to commit"
@@ -426,6 +426,10 @@ jobs:
               issue_number: ${{ steps.create_pr.outputs.result }},
               labels: labels
             });
+      - name: Cleanup temporary files
+        if: always()
+        run: |
+          rm -f analysis_result.json update_changelog.bal pr_description.txt git_diff.txt client_diff.txt types_diff.txt
 
       - name: Upload analysis results
         if: steps.diff.outputs.has_changes == 'true'
