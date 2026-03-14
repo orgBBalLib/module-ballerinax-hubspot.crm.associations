@@ -137,28 +137,53 @@ jobs:
       - name: Update CHANGELOG.md
         if: steps.diff.outputs.has_changes == 'true'
         run: |
-          # Extract PR-like description from analysis
-          SUMMARY=$(jq -r '.summary' analysis_result.json)
-          BREAKING=$(jq -r '.breakingChanges[]' analysis_result.json 2>/dev/null || echo "")
-          FEATURES=$(jq -r '.newFeatures[]' analysis_result.json 2>/dev/null || echo "")
-          FIXES=$(jq -r '.bugFixes[]' analysis_result.json 2>/dev/null || echo "")
+          echo "Building PR description for changelog..."
 
-          # Build PR description format
-          PR_DESC="### Summary
-          $SUMMARY
+          # Build PR description in the exact format the parser expects
+          cat > pr_description.txt <<'PRDESC'
+          ### Summary
+          PRDESC
 
-          ### Breaking Changes
-          $BREAKING
+          # Add summary
+          jq -r '.summary' analysis_result.json >> pr_description.txt
 
-          ### New Features
-          $FEATURES
+          echo "" >> pr_description.txt
+          echo "### Breaking Changes" >> pr_description.txt
 
-          ### Improvements
-          $FIXES"
+          # Add breaking changes with bullets
+          jq -r '.breakingChanges[]' analysis_result.json 2>/dev/null | while IFS= read -r line; do
+            if [ -n "$line" ]; then
+              echo "- $line" >> pr_description.txt
+            fi
+          done
 
-          echo "$PR_DESC" > pr_description.txt
+          echo "" >> pr_description.txt
+          echo "### New Features" >> pr_description.txt
 
-          # Run changelog updater (from root directory where we copied it)
+          # Add new features with bullets
+          jq -r '.newFeatures[]' analysis_result.json 2>/dev/null | while IFS= read -r line; do
+            if [ -n "$line" ]; then
+              echo "- $line" >> pr_description.txt
+            fi
+          done
+
+          echo "" >> pr_description.txt
+          echo "### Improvements" >> pr_description.txt
+
+          # Add improvements/fixes with bullets
+          jq -r '.bugFixes[]' analysis_result.json 2>/dev/null | while IFS= read -r line; do
+            if [ -n "$line" ]; then
+              echo "- $line" >> pr_description.txt
+            fi
+          done
+
+          echo ""
+          echo "=== Generated PR Description ==="
+          cat pr_description.txt
+          echo "================================"
+          echo ""
+
+          # Run changelog updater
           bal run update_changelog.bal -- "$(cat pr_description.txt)"
 
       - name: Extract code owners
