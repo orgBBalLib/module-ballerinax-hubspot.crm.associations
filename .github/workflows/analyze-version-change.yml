@@ -139,43 +139,45 @@ jobs:
         run: |
           echo "Building PR description for changelog..."
 
-          # Build PR description in the exact format the parser expects
-          cat > pr_description.txt <<'PRDESC'
-          ### Summary
-          PRDESC
-
-          # Add summary
+          # Initialize the PR description file
+          echo "### Summary" > pr_description.txt
           jq -r '.summary' analysis_result.json >> pr_description.txt
-
           echo "" >> pr_description.txt
+
+          # Add Breaking Changes section
           echo "### Breaking Changes" >> pr_description.txt
-
-          # Add breaking changes with bullets
-          jq -r '.breakingChanges[]' analysis_result.json 2>/dev/null | while IFS= read -r line; do
-            if [ -n "$line" ]; then
+          BREAKING_COUNT=$(jq -r '.breakingChanges | length' analysis_result.json)
+          if [ "$BREAKING_COUNT" -gt 0 ]; then
+            jq -r '.breakingChanges[]' analysis_result.json | while IFS= read -r line; do
               echo "- $line" >> pr_description.txt
-            fi
-          done
-
+            done
+          else
+            echo "- None" >> pr_description.txt
+          fi
           echo "" >> pr_description.txt
+
+          # Add New Features section
           echo "### New Features" >> pr_description.txt
-
-          # Add new features with bullets
-          jq -r '.newFeatures[]' analysis_result.json 2>/dev/null | while IFS= read -r line; do
-            if [ -n "$line" ]; then
+          FEATURES_COUNT=$(jq -r '.newFeatures | length' analysis_result.json)
+          if [ "$FEATURES_COUNT" -gt 0 ]; then
+            jq -r '.newFeatures[]' analysis_result.json | while IFS= read -r line; do
               echo "- $line" >> pr_description.txt
-            fi
-          done
-
+            done
+          else
+            echo "- None" >> pr_description.txt
+          fi
           echo "" >> pr_description.txt
-          echo "### Improvements" >> pr_description.txt
 
-          # Add improvements/fixes with bullets
-          jq -r '.bugFixes[]' analysis_result.json 2>/dev/null | while IFS= read -r line; do
-            if [ -n "$line" ]; then
+          # Add Improvements section
+          echo "### Improvements" >> pr_description.txt
+          FIXES_COUNT=$(jq -r '.bugFixes | length' analysis_result.json)
+          if [ "$FIXES_COUNT" -gt 0 ]; then
+            jq -r '.bugFixes[]' analysis_result.json | while IFS= read -r line; do
               echo "- $line" >> pr_description.txt
-            fi
-          done
+            done
+          else
+            echo "- None" >> pr_description.txt
+          fi
 
           echo ""
           echo "=== Generated PR Description ==="
@@ -185,6 +187,16 @@ jobs:
 
           # Run changelog updater
           bal run update_changelog.bal -- "$(cat pr_description.txt)"
+
+          # Verify CHANGELOG.md was created/updated
+          if [ -f "CHANGELOG.md" ]; then
+            echo "✅ CHANGELOG.md created/updated successfully"
+            echo "First 50 lines:"
+            head -50 CHANGELOG.md
+          else
+            echo "⚠️ WARNING: CHANGELOG.md was not created"
+            ls -la
+          fi
 
       - name: Extract code owners
         if: steps.diff.outputs.has_changes == 'true'
