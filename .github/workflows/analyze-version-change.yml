@@ -237,22 +237,44 @@ jobs:
           git config --local user.email "ballerina-bot@ballerina.io"
           git config --local user.name "ballerina-bot"
 
+          echo "Files before git add:"
+          ls -la | grep -E '(CHANGELOG|gradle.properties|Ballerina.toml)'
+
           # Add version file
           git add gradle.properties
 
-          # Add any CHANGELOG files (case-insensitive)
-          git add CHANGELOG.md Changelog.md changelog.md ChangeLog.md 2>/dev/null || true
+          # Add CHANGELOG.md (case-insensitive, try all variants)
+          git add CHANGELOG.md 2>/dev/null || true
+          git add Changelog.md 2>/dev/null || true
+          git add changelog.md 2>/dev/null || true
+          git add ChangeLog.md 2>/dev/null || true
+
+          # Verify CHANGELOG.md is staged
+          if git diff --staged --name-only | grep -qi "changelog"; then
+            echo "✅ CHANGELOG.md is staged for commit"
+          else
+            echo "⚠️ WARNING: CHANGELOG.md is not staged!"
+            echo "Current directory contents:"
+            ls -la
+            echo "Git status:"
+            git status
+          fi
 
           # Add generated Ballerina files if they exist
           if [ -f ballerina/Ballerina.toml ]; then
             git add ballerina/Ballerina.toml
+            echo "Added ballerina/Ballerina.toml"
           fi
           if [ -f ballerina/Dependencies.toml ]; then
             git add ballerina/Dependencies.toml
+            echo "Added ballerina/Dependencies.toml"
           fi
 
+          echo "Staged files:"
+          git diff --staged --name-only
+
           # Clean up temporary files
-          rm -f update_changelog.bal pr_description.txt
+          rm -f update_changelog.bal pr_description.txt analysis_result.json git_diff.txt client_diff.txt types_diff.txt
 
           if git diff --staged --quiet; then
             echo "No changes to commit"
@@ -263,7 +285,12 @@ jobs:
             else
               COMMIT_MSG="$COMMIT_MSG and regenerate Ballerina files"
             fi
+
+            echo "Committing with message: $COMMIT_MSG"
             git commit -m "$COMMIT_MSG"
+
+            echo "Commit created. Files in commit:"
+            git show --name-only --oneline HEAD
           fi
 
           git push origin $BRANCH_NAME
