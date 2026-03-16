@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           token: ${{ secrets.PAT_TOKEN }}
@@ -184,6 +184,21 @@ jobs:
           cat pr_description.txt
           echo "================================"
           echo ""
+
+          # Sanitize pr_description.txt before passing to update_changelog.bal.
+          # The script does substring(0, 50) on every line it processes, which
+          # crashes on lines shorter than 50 characters. Pad every line to at
+          # least 50 characters with trailing spaces so the call is always safe.
+          python3 - <<'PYEOF'
+          with open("pr_description.txt", "r") as f:
+              lines = f.readlines()
+          with open("pr_description.txt", "w") as f:
+              for line in lines:
+                  stripped = line.rstrip("\n")
+                  if len(stripped) < 50:
+                      stripped = stripped.ljust(50)
+                  f.write(stripped + "\n")
+          PYEOF
 
           # Run changelog updater
           bal run update_changelog.bal -- "$(cat pr_description.txt)"
@@ -426,6 +441,7 @@ jobs:
               issue_number: ${{ steps.create_pr.outputs.result }},
               labels: labels
             });
+
       - name: Cleanup temporary files
         if: always()
         run: |
