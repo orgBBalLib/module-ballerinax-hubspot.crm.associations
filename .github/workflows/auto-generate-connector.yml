@@ -80,15 +80,20 @@ jobs:
           echo "has_changes=true" >> $GITHUB_OUTPUT
           echo "Diff generated successfully"
 
+      - name: Clone ballerina-library scripts
+        if: steps.diff.outputs.has_changes == 'true'
+        run: |
+          git clone -b main https://github.com/orgBBalLib/ballerina-library.git temp-library
+
       - name: Run analysis
         if: steps.diff.outputs.has_changes == 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           DIFF_CONTENT=$(cat git_diff.txt)
-          cd scripts
+          cd temp-library/connector_automator/modules/dependabot_version_analyser
           bal run analyze_version_change.bal -- "$DIFF_CONTENT"
-          mv analysis_result.json ../
+          mv analysis_result.json "$GITHUB_WORKSPACE/"
 
       - name: Display results
         if: always()
@@ -142,13 +147,11 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "change_type=$CHANGE_TYPE" >> $GITHUB_OUTPUT
 
-      - name: Clone update_changelog script from ballerina-library
+      - name: Copy update_changelog script from ballerina-library
         if: steps.diff.outputs.has_changes == 'true'
         run: |
-          git clone -b main https://github.com/orgBBalLib/ballerina-library.git temp-library
-          cp temp-library/connector_scripts/update_changelog.bal ./
-          rm -rf temp-library
-          echo "Copied update_changelog.bal from ballerina-library/connector_scripts"
+          cp temp-library/connector_automator/modules/dependabot_version_analyser/update_changelog.bal ./
+          echo "Copied update_changelog.bal from ballerina-library/connector_automator/modules/dependabot_version_analyser"
 
       - name: Update CHANGELOG.md
         if: steps.diff.outputs.has_changes == 'true'
@@ -462,6 +465,7 @@ jobs:
         if: always()
         run: |
           rm -f analysis_result.json update_changelog.bal pr_description.txt git_diff.txt client_diff.txt types_diff.txt
+          rm -rf temp-library
 
       - name: Upload analysis results
         if: steps.diff.outputs.has_changes == 'true'
