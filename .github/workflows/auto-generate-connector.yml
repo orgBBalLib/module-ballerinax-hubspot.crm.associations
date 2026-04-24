@@ -463,12 +463,6 @@ jobs:
               labels: labels
             });
 
-      - name: Cleanup temporary files
-        if: always()
-        run: |
-          rm -f analysis_result.json update_changelog.bal pr_description.txt git_diff.txt client_diff.txt types_diff.txt
-          rm -rf temp-library
-
       - name: Upload analysis results
         if: steps.diff.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v4
@@ -479,3 +473,9 @@ jobs:
             git_diff.txt
             client_diff.txt
             types_diff.txt
+
+      - name: Cleanup temporary files
+        if: always()
+        run: |
+          rm -f analysis_result.json update_changelog.bal pr_description.txt git_diff.txt client_diff.txt types_diff.txt
+          rm -rf temp-library
