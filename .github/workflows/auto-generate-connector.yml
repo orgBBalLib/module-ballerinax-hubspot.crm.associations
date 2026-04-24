@@ -91,10 +91,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           cp temp-library/connector_automator/modules/client_regenerator/analyze_version_change.bal ./
-          cp temp-library/connector_automator/modules/client_regenerator/sort_ballerina_client.bal ./
-          cp temp-library/connector_automator/modules/client_regenerator/sort_ballerina_type.bal ./
-          bal run analyze_version_change.bal
-          rm -f analyze_version_change.bal sort_ballerina_client.bal sort_ballerina_type.bal
+          bal run analyze_version_change.bal -- "$(cat git_diff.txt)"
+          rm -f analyze_version_change.bal
 
       - name: Display results
         if: always()
@@ -147,12 +145,6 @@ jobs:
 
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "change_type=$CHANGE_TYPE" >> $GITHUB_OUTPUT
-
-      - name: Copy update_changelog script from ballerina-library
-        if: steps.diff.outputs.has_changes == 'true'
-        run: |
-          cp temp-library/connector_automator/modules/client_regenerator/update_changelog.bal ./
-          echo "Copied update_changelog.bal from ballerina-library/connector_automator/modules/client_regenerator"
 
       - name: Update CHANGELOG.md
         if: steps.diff.outputs.has_changes == 'true'
@@ -220,8 +212,23 @@ jobs:
                   f.write(stripped + "\n")
           PYEOF
 
-          # Run changelog updater
-          bal run update_changelog.bal -- "$(cat pr_description.txt)"
+          # Run changelog updater via a temp Ballerina package
+          # (update_changelog.bal exports runUpdateChangelog, not main)
+          CHANGELOG_PKG=$(mktemp -d)
+          cp temp-library/connector_automator/modules/client_regenerator/update_changelog.bal "$CHANGELOG_PKG/"
+          cat > "$CHANGELOG_PKG/Ballerina.toml" << 'TOML'
+          [package]
+          org = "temp"
+          name = "changelog_runner"
+          version = "0.1.0"
+          TOML
+          cat > "$CHANGELOG_PKG/entry.bal" << 'BAL'
+          public function main(string prDescription) returns error? {
+              check runUpdateChangelog(prDescription);
+          }
+          BAL
+          bal run "$CHANGELOG_PKG" -- "$(cat pr_description.txt)"
+          rm -rf "$CHANGELOG_PKG"
 
           # Verify CHANGELOG.md was created/updated
           if [ -f "CHANGELOG.md" ]; then
