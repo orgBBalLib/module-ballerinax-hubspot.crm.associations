@@ -91,9 +91,9 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           DIFF_CONTENT=$(cat git_diff.txt)
-          cd temp-library/connector_automator/modules/dependabot_version_analyser
+          cp temp-library/connector_automator/modules/client_regenerator/analyze_version_change.bal ./
           bal run analyze_version_change.bal -- "$DIFF_CONTENT"
-          mv analysis_result.json "$GITHUB_WORKSPACE/"
+          rm -f analyze_version_change.bal
 
       - name: Display results
         if: always()
@@ -150,8 +150,8 @@ jobs:
       - name: Copy update_changelog script from ballerina-library
         if: steps.diff.outputs.has_changes == 'true'
         run: |
-          cp temp-library/connector_automator/modules/dependabot_version_analyser/update_changelog.bal ./
-          echo "Copied update_changelog.bal from ballerina-library/connector_automator/modules/dependabot_version_analyser"
+          cp temp-library/connector_automator/modules/client_regenerator/update_changelog.bal ./
+          echo "Copied update_changelog.bal from ballerina-library/connector_automator/modules/client_regenerator"
 
       - name: Update CHANGELOG.md
         if: steps.diff.outputs.has_changes == 'true'
