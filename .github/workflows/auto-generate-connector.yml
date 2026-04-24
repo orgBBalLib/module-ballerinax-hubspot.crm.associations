@@ -90,11 +90,10 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          DIFF_CONTENT=$(cat git_diff.txt)
           cp temp-library/connector_automator/modules/client_regenerator/analyze_version_change.bal ./
           cp temp-library/connector_automator/modules/client_regenerator/sort_ballerina_client.bal ./
           cp temp-library/connector_automator/modules/client_regenerator/sort_ballerina_type.bal ./
-          bal run analyze_version_change.bal -- "$DIFF_CONTENT"
+          bal run analyze_version_change.bal
           rm -f analyze_version_change.bal sort_ballerina_client.bal sort_ballerina_type.bal
 
       - name: Display results
