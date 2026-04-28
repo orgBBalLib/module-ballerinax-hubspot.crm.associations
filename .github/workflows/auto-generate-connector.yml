@@ -65,10 +65,9 @@ jobs:
         id: diff
         run: |
           BRANCH_NAME="${{ steps.find_branch.outputs.branch_name }}"
-          echo "Generating diff between origin/main and origin/$BRANCH_NAME..."
-
-          git diff origin/main..origin/$BRANCH_NAME -- ballerina/client.bal > client_diff.txt || true
-          git diff origin/main..origin/$BRANCH_NAME -- ballerina/types.bal > types_diff.txt || true
+          echo "Generating diff between merge-base(origin/main, origin/$BRANCH_NAME) and origin/$BRANCH_NAME..."
+          git diff origin/main...origin/$BRANCH_NAME -- ballerina/client.bal > client_diff.txt || true
+          git diff origin/main...origin/$BRANCH_NAME -- ballerina/types.bal > types_diff.txt || true
           cat client_diff.txt types_diff.txt > git_diff.txt
 
           if [ ! -s git_diff.txt ]; then
