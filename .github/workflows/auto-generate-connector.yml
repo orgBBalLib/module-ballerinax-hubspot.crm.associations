@@ -91,7 +91,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           cp temp-library/connector_automator/modules/client_regenerator/analyze_version_change.bal ./
-          bal run analyze_version_change.bal -- "$(cat git_diff.txt)"
+          bal run analyze_version_change.bal -- git_diff.txt
           rm -f analyze_version_change.bal
 
       - name: Display results
@@ -425,11 +425,31 @@ jobs:
               prBody += '\n';
             }
 
+            const { execSync } = require('child_process');
+            const hasChangelogUpdate = (() => {
+              try {
+                const branchDiff = execSync('git diff --name-only origin/main...HEAD -- CHANGELOG.md', { encoding: 'utf8' }).trim();
+                if (branchDiff.split('\n').includes('CHANGELOG.md')) {
+                  return true;
+                }
+              } catch (error) {
+                core.warning(`Unable to determine branch diff for CHANGELOG.md: ${error.message}`);
+              }
+              try {
+                const workingTreeStatus = execSync('git status --short -- CHANGELOG.md', { encoding: 'utf8' }).trim();
+                return workingTreeStatus.length > 0;
+              } catch (error) {
+                core.warning(`Unable to determine working tree status for CHANGELOG.md: ${error.message}`);
+                return false;
+              }
+            })();
             prBody += `---\n\n`;
             if (gradleBuildFailed) {
               prBody += `⚠️ BUILD FAILED - Please fix the Gradle build errors before merging.\n`;
             }
-            prBody += `**CHANGELOG.md** has been automatically updated.\n\n`;
+            if (hasChangelogUpdate) {
+              prBody += `**CHANGELOG.md** has been automatically updated.\n\n`;
+            }
             prBody += `Manual Review Required - Please review the changes and approve if appropriate.\n`;
 
             const buildStatus = gradleBuildFailed ? '[BUILD FAILED] ' : '';
