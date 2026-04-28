@@ -90,7 +90,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           cp temp-library/connector_automator/modules/client_regenerator/analyze_version_change.bal ./
-          bal run analyze_version_change.bal -- git_diff.txt
+          bal run analyze_version_change.bal -- "$(cat git_diff.txt)"
           rm -f analyze_version_change.bal
 
       - name: Display results
