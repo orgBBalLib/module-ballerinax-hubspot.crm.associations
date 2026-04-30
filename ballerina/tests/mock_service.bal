@@ -40,10 +40,10 @@ http:Service mockService = service object {
     # http:DefaultStatusCodeResponse (An error occurred.)
     resource function get objects/[string objectType]/[string objectId]/associations/[string toObjectType](string? after, int:Signed32 'limit = 500) returns CollectionResponseMultiAssociatedObjectWithLabelForwardPaging|error {
         if objectType == FROM_OBJECT_TYPE && objectId == FROM_OBJECT_ID && toObjectType == TO_OBJECT_TYPE {
-            return {
+            CollectionResponseMultiAssociatedObjectWithLabelForwardPaging response = {
                 results: [
                     {
-                        toObjectId: 38056537805,
+                        toObjectId: "38056537805",
                         associationTypes: [
                             {
                                 category: "HUBSPOT_DEFINED",
@@ -53,12 +53,12 @@ http:Service mockService = service object {
                             {
                                 category: "HUBSPOT_DEFINED",
                                 typeId: 341,
-                                label: null
+                                label: ()
                             }
                         ]
                     },
                     {
-                        toObjectId: 38056537829,
+                        toObjectId: "38056537829",
                         associationTypes: [
                             {
                                 category: "USER_DEFINED",
@@ -68,12 +68,13 @@ http:Service mockService = service object {
                             {
                                 category: "HUBSPOT_DEFINED",
                                 typeId: 341,
-                                label: null
+                                label: ()
                             }
                         ]
                     }
                 ]
             };
+            return response;
         } else {
             return error("Unable to infer object type from: " + objectType);
         }
@@ -131,20 +132,21 @@ http:Service mockService = service object {
     # http:DefaultStatusCodeResponse (An error occurred.)
     resource function post associations/[string fromObjectType]/[string toObjectType]/batch/create(@http:Payload BatchInputPublicAssociationMultiPost payload) returns BatchResponseLabelsBetweenObjectPair|error {
         if fromObjectType == FROM_OBJECT_TYPE && toObjectType == TO_OBJECT_TYPE {
-            return {
+            BatchResponseLabelsBetweenObjectPair response = {
                 status: "COMPLETE",
                 results: [
                     {
                         fromObjectTypeId: "0-3",
-                        fromObjectId: 46989749974,
+                        fromObjectId: "46989749974",
                         toObjectTypeId: "0-2",
-                        toObjectId: 43500581578,
+                        toObjectId: "43500581578",
                         labels: ["test-deal->company-1"]
                     }
                 ],
                 startedAt: "2025-02-18T08:53:51.080Z",
                 completedAt: "2025-02-18T08:53:51.205Z"
             };
+            return response;
         } else {
             return error("Unable to infer object type from: " + fromObjectType);
         }
@@ -166,7 +168,7 @@ http:Service mockService = service object {
     # http:MultiStatus (multiple statuses)
     # http:DefaultStatusCodeResponse (An error occurred.)
     resource function post associations/[string fromObjectType]/[string toObjectType]/batch/read(@http:Payload BatchInputPublicFetchAssociationsBatchRequest payload) returns BatchResponsePublicAssociationMultiWithLabel|error {
-        return {
+        BatchResponsePublicAssociationMultiWithLabel response = {
             status: "COMPLETE",
             results: [
                 {
@@ -175,12 +177,12 @@ http:Service mockService = service object {
                     },
                     to: [
                         {
-                            toObjectId: 43500581578,
+                            toObjectId: "43500581578",
                             associationTypes: [
                                 {
                                     category: "HUBSPOT_DEFINED",
                                     typeId: 341,
-                                    label: null
+                                    label: ()
                                 },
                                 {
                                     category: "HUBSPOT_DEFINED",
@@ -190,12 +192,12 @@ http:Service mockService = service object {
                             ]
                         },
                         {
-                            toObjectId: 38056537829,
+                            toObjectId: "38056537829",
                             associationTypes: [
                                 {
                                     category: "HUBSPOT_DEFINED",
                                     typeId: 341,
-                                    label: null
+                                    label: ()
                                 },
                                 {
                                     category: "USER_DEFINED",
@@ -210,6 +212,7 @@ http:Service mockService = service object {
             startedAt: "2025-02-17T11:08:16.755Z",
             completedAt: "2025-02-17T11:08:16.767Z"
         };
+        return response;
     }
 
     # Report
@@ -275,13 +278,14 @@ http:Service mockService = service object {
     # http:Created (successful operation)
     # http:DefaultStatusCodeResponse (An error occurred.)
     resource function put objects/[string objectType]/[string objectId]/associations/[string toObjectType]/[string toObjectId](@http:Payload AssociationSpec[] payload) returns LabelsBetweenObjectPair|error {
-        return {
+        LabelsBetweenObjectPair response = {
             fromObjectTypeId: "0-3",
-            fromObjectId: 46989749974,
+            fromObjectId: "46989749974",
             toObjectTypeId: "0-2",
-            toObjectId: 43500581578,
+            toObjectId: "43500581578",
             labels: ["test-deal->company-1"]
         };
+        return response;
     }
 };
 
