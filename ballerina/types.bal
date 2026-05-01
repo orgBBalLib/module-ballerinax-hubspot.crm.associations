@@ -19,56 +19,91 @@
 
 import ballerina/http;
 
+# Represents a standard error response in the HubSpot API, providing detailed information about an error that occurred during an API request
 public type StandardError record {
+    # A more specific error category within each main category
     record {} subCategory?;
+    # Additional context-specific information related to the error
     record {|string[]...;|} context;
+    # URLs linking to documentation or resources associated with the error
     record {|string...;|} links;
+    # A unique ID for the error instance
     string id?;
+    # The main category of the error
     string category;
+    # A human-readable string describing the error and possible remediation steps
     string message;
+    # The detailed error objects
     ErrorDetail[] errors;
+    # The HTTP status code associated with the error
     string status;
 };
 
+# The relationship descriptors applicable between two object types
 public type LabelsBetweenObjectPair record {
+    # The type ID of the source object in the association
     string fromObjectTypeId;
+    # The ID of the target object in the association
     int toObjectId;
+    # The type ID of the target object in the association
     string toObjectTypeId;
+    # The ID of the source object in the association
     int fromObjectId;
+    # An array of labels associated with the relationship between the objects
     string[] labels;
 };
 
+# Response object containing details about a report creation request.
 public type ReportCreationResponse record {
+    # Email of the user
     string userEmail;
+    # ID of the user
     int:Signed32 userId;
+    # Represents a date and time value with timezone information.
     DateTime enqueueTime;
 };
 
+# Represents multiple associations with labels between objects.
 public type PublicAssociationMultiWithLabel record {
+    # Contains the Id of a Public Object
     PublicObjectId 'from;
+    # Pagination information for navigating through result sets.
     Paging paging?;
+    # Array of target objects with their associated labels.
     MultiAssociatedObjectWithLabel[] to;
 };
 
+# Batch input for creating multiple default associations.
 public type BatchInputPublicDefaultAssociationMultiPost record {
+    # Array of default association creation requests to process.
     PublicDefaultAssociationMultiPost[] inputs;
 };
 
+# Batch input for archiving multiple associations.
 public type BatchInputPublicAssociationMultiArchive record {
+    # Array of association archive requests to process.
     PublicAssociationMultiArchive[] inputs;
 };
 
+# Represents an object that is associated with multiple other objects, with optional context
 public type MultiAssociatedObjectWithLabel record {
+    # Array of association type specifications with labels.
     AssociationSpecWithLabel[] associationTypes;
-    int toObjectId;
+    # The unique identifier for the target object in the association
+    string toObjectId;
 };
 
+# Represents a date and time value with timezone information.
 public type DateTime record {
+    # Indicates whether the DateTime value represents only a date without a time component
     boolean dateOnly;
+    # The integer value representing the shift in minutes from UTC for the DateTime value
     int:Signed32 timeZoneShift;
+    # The integer value representing a specific point in time
     int value;
 };
 
+# Detailed information about a specific error occurrence.
 public type ErrorDetail record {
     # A specific category that contains more specific detail about the error
     string subCategory?;
@@ -82,29 +117,46 @@ public type ErrorDetail record {
     string message;
 };
 
+# Pagination object for forward navigation through results.
 public type ForwardPaging record {
+    # Specifies the paging information needed to retrieve the next set of results in a paginated API response
     NextPage next?;
 };
 
+# Defines the type, direction, and details of the relationship between two CRM objects
 public type AssociationSpecWithLabel record {
+    # The unique identifier for the type of association
     int:Signed32 typeId;
+    # A label describing the association between two objects
     string? label?;
-    "HUBSPOT_DEFINED"|"USER_DEFINED"|"INTEGRATOR_DEFINED" category;
+    # The category of the association, such as HUBSPOT_DEFINED, USER_DEFINED, or INTEGRATOR_DEFINED
+    "HUBSPOT_DEFINED"|"INTEGRATOR_DEFINED"|"USER_DEFINED"|"WORK" category;
 };
 
+# Request object for creating associations between objects with specified types.
 public type PublicAssociationMultiPost record {
+    # Array of association type specifications to apply.
     AssociationSpec[] types;
+    # Contains the Id of a Public Object
     PublicObjectId 'from;
+    # Contains the Id of a Public Object
     PublicObjectId to;
 };
 
+# Batch response containing labels between object pairs with processing status.
 public type BatchResponseLabelsBetweenObjectPair record {
+    # The timestamp when the batch processing was completed, in ISO 8601 format
     string completedAt;
+    # The timestamp when the batch request was initially made, in ISO 8601 format
     string requestedAt?;
+    # The timestamp when the batch processing began, in ISO 8601 format
     string startedAt;
+    # An object containing relevant links related to the batch request
     record {|string...;|} links?;
+    # Array of label results between object pairs.
     LabelsBetweenObjectPair[] results;
-    "PENDING"|"PROCESSING"|"CANCELED"|"COMPLETE" status;
+    # The status of the batch processing request: "PENDING", "PROCESSING", "CANCELLED", or "COMPLETE"
+    "CANCELED"|"COMPLETE"|"PENDING"|"PROCESSING" status;
 };
 
 # OAuth2 Refresh Token Grant Configs
@@ -158,116 +210,188 @@ public type ConnectionConfig record {|
     boolean laxDataBinding = true;
 |};
 
+# Contains the Id of a Public Object
 public type PublicObjectId record {
+    # ID of the object
     string id;
 };
 
+# Request object for archiving multiple associations from a source object.
 public type PublicAssociationMultiArchive record {
+    # Contains the Id of a Public Object
     PublicObjectId 'from;
+    # Array of target object identifiers to disassociate from the source.
     PublicObjectId[] to;
 };
 
+# Batch response containing labeled associations with potential errors and processing status.
 public type BatchResponsePublicAssociationMultiWithLabelWithErrors record {
+    # Timestamp indicating when the batch operation completed.
     string completedAt;
+    # Total count of errors encountered during batch processing.
     int:Signed32 numErrors?;
+    # Timestamp indicating when the batch operation was requested.
     string requestedAt?;
+    # Timestamp indicating when the batch operation started processing.
     string startedAt;
+    # Map of related resource links for the batch response.
     record {|string...;|} links?;
+    # Array of successfully processed labeled associations.
     PublicAssociationMultiWithLabel[] results;
+    # Array of errors encountered during batch processing.
     StandardError[] errors?;
-    "PENDING"|"PROCESSING"|"CANCELED"|"COMPLETE" status;
+    # Current processing status: CANCELED, COMPLETE, PENDING, or PROCESSING.
+    "CANCELED"|"COMPLETE"|"PENDING"|"PROCESSING" status;
 };
 
+# Pagination information for navigating through result sets.
 public type Paging record {
+    # Specifies the paging information needed to retrieve the next set of results in a paginated API response
     NextPage next?;
+    # specifies the paging information needed to retrieve the previous set of results in a paginated API response
     PreviousPage prev?;
 };
 
+# Represents a default association between two objects with its specification.
 public type PublicDefaultAssociation record {
+    # Defines the type, direction, and details of the relationship between two CRM objects
     AssociationSpec associationSpec;
+    # Contains the Id of a Public Object
     PublicObjectId 'from;
+    # Contains the Id of a Public Object
     PublicObjectId to;
 };
 
+# Request body for creating multiple associations in a single batch operation.
 public type BatchInputPublicAssociationMultiPost record {
+    # Array of association objects to create in the batch request.
     PublicAssociationMultiPost[] inputs;
 };
 
+# Request object for creating a default association between two objects.
 public type PublicDefaultAssociationMultiPost record {
+    # Contains the Id of a Public Object
     PublicObjectId 'from;
+    # Contains the Id of a Public Object
     PublicObjectId to;
 };
 
-public type BatchInputPublicFetchAssociationsBatchRequest record {
-    PublicFetchAssociationsBatchRequest[] inputs;
-};
-
-public type BatchResponsePublicAssociationMultiWithLabel record {
-    string completedAt;
-    string requestedAt?;
-    string startedAt;
-    record {|string...;|} links?;
-    PublicAssociationMultiWithLabel[] results;
-    "PENDING"|"PROCESSING"|"CANCELED"|"COMPLETE" status;
-};
-
-public type BatchResponsePublicDefaultAssociation record {
-    string completedAt;
-    int:Signed32 numErrors?;
-    string requestedAt?;
-    string startedAt;
-    record {|string...;|} links?;
-    PublicDefaultAssociation[] results;
-    StandardError[] errors?;
-    "PENDING"|"PROCESSING"|"CANCELED"|"COMPLETE" status;
-};
-
-public type AssociationSpec record {
-    "HUBSPOT_DEFINED"|"USER_DEFINED"|"INTEGRATOR_DEFINED" associationCategory;
-    int:Signed32 associationTypeId;
-};
-
-public type BatchResponseLabelsBetweenObjectPairWithErrors record {
-    string completedAt;
-    int:Signed32 numErrors?;
-    string requestedAt?;
-    string startedAt;
-    record {|string...;|} links?;
-    LabelsBetweenObjectPair[] results;
-    StandardError[] errors?;
-    "PENDING"|"PROCESSING"|"CANCELED"|"COMPLETE" status;
-};
-
-public type PreviousPage record {
-    string before;
-    string link?;
-};
-
-public type CollectionResponseMultiAssociatedObjectWithLabelForwardPaging record {
-    ForwardPaging paging?;
-    MultiAssociatedObjectWithLabel[] results;
-};
-
-public type NextPage record {
-    string link?;
-    string after;
-};
-
-# Represents the Queries record for the operation: get-/objects/{objectType}/{objectId}/associations/{toObjectType}_getPage
-public type GetObjectsObjectTypeObjectIdAssociationsToObjectTypeGetPageQueries record {
+# Represents the Queries record for the operation: get-/crm/v4/objects/{objectType}/{objectId}/associations/{toObjectType}_getPage
+public type GetCrmV4ObjectsObjectTypeObjectIdAssociationsToObjectTypeGetPageQueries record {
     # The maximum number of results to display per page
     int:Signed32 'limit = 500;
     # The paging cursor token of the last successfully read resource will be returned as the `paging.next.after` JSON property of a paged response containing more results
     string after?;
 };
 
+# The response returned after performing a batch operation on associations
+public type BatchResponsePublicDefaultAssociation record {
+    # The timestamp when the batch process was completed, in ISO 8601 format
+    string completedAt;
+    # The number of errors encountered during the batch processing
+    int:Signed32 numErrors?;
+    # The timestamp when the batch process was initiated, in ISO 8601 format
+    string requestedAt?;
+    # The timestamp when the batch process began execution, in ISO 8601 format
+    string startedAt;
+    # An object containing relevant links related to the batch request
+    record {|string...;|} links?;
+    # Array of successfully created default associations.
+    PublicDefaultAssociation[] results;
+    # Array of errors encountered during batch processing.
+    StandardError[] errors?;
+    # The status of the batch processing request: "PENDING", "PROCESSING", "CANCELLED", or "COMPLETE"
+    "CANCELED"|"COMPLETE"|"PENDING"|"PROCESSING" status;
+};
+
+# Request body for fetching multiple associations in a single batch operation.
+public type BatchInputPublicFetchAssociationsBatchRequest record {
+    # Array of association fetch requests to process in the batch.
+    PublicFetchAssociationsBatchRequest[] inputs;
+};
+
+# Response object containing batch results for labeled association operations.
+public type BatchResponsePublicAssociationMultiWithLabel record {
+    # The timestamp when the batch processing was completed, in ISO 8601 format
+    string completedAt;
+    # The timestamp when the batch request was initially made, in ISO 8601 format
+    string requestedAt?;
+    # The timestamp when the batch processing began, in ISO 8601 format
+    string startedAt;
+    # An object containing relevant links related to the batch request
+    record {|string...;|} links?;
+    # Array of successfully processed association results with labels.
+    PublicAssociationMultiWithLabel[] results;
+    # The status of the batch processing request: "PENDING", "PROCESSING", "CANCELED", or "COMPLETE"
+    "CANCELED"|"COMPLETE"|"PENDING"|"PROCESSING" status;
+};
+
+# Defines the type, direction, and details of the relationship between two CRM objects
+public type AssociationSpec record {
+    # The category of the association, such as "HUBSPOT_DEFINED"
+    "HUBSPOT_DEFINED"|"INTEGRATOR_DEFINED"|"USER_DEFINED"|"WORK" associationCategory;
+    # The ID representing the specific type of association
+    int:Signed32 associationTypeId;
+};
+
+# Response object for batch label operations including any processing errors.
+public type BatchResponseLabelsBetweenObjectPairWithErrors record {
+    # Timestamp when batch processing completed, in ISO 8601 format.
+    string completedAt;
+    # Total count of errors encountered during batch processing.
+    int:Signed32 numErrors?;
+    # Timestamp when the batch request was received, in ISO 8601 format.
+    string requestedAt?;
+    # Timestamp when batch processing began, in ISO 8601 format.
+    string startedAt;
+    # Map of related resource links for the batch response.
+    record {|string...;|} links?;
+    # Array of successfully retrieved labels between object pairs.
+    LabelsBetweenObjectPair[] results;
+    # Array of errors encountered during batch label retrieval.
+    StandardError[] errors?;
+    # Current processing state of the batch operation.
+    "CANCELED"|"COMPLETE"|"PENDING"|"PROCESSING" status;
+};
+
+# specifies the paging information needed to retrieve the previous set of results in a paginated API response
+public type PreviousPage record {
+    # A paging cursor token for retrieving previous pages
+    string before;
+    # A URL that can be used to retrieve the previous pages' results
+    string link?;
+};
+
+# Paginated response containing labeled associations between multiple objects.
+public type CollectionResponseMultiAssociatedObjectWithLabelForwardPaging record {
+    # Pagination object for forward navigation through results.
+    ForwardPaging paging?;
+    # Array of associated objects with their labels.
+    MultiAssociatedObjectWithLabel[] results;
+};
+
+# Specifies the paging information needed to retrieve the next set of results in a paginated API response
+public type NextPage record {
+    # A URL that can be used to retrieve the next page results
+    string link?;
+    # A paging cursor token for retrieving subsequent pages
+    string after;
+};
+
 # Provides API key configurations needed when communicating with a remote HTTP endpoint.
 public type ApiKeysConfig record {|
-    string privateAppLegacy;
+    # HubSpot API key for authentication
+    string hapikey;
+    # Private app access token
     string privateApp;
+    # Private app legacy access token
+    string privateAppLegacy;
 |};
 
+# Request object for fetching associations for a specific object in batch.
 public type PublicFetchAssociationsBatchRequest record {
-    string id;
+    # A paging cursor token used to retrieve the next set of results in a paginated response
     string after?;
+    # The unique identifier for the object whose associations are being fetched
+    string id;
 };
