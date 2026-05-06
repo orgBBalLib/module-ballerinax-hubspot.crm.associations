@@ -25,7 +25,7 @@ hsassociations:ConnectionConfig config = {
     }
 };
 
-final hsassociations:Client hubspot = check new (config, "https://api.hubapi.com/crm/v4");
+final hsassociations:Client hubspot = check new (config);
 
 const string FROM_OBJECT_TYPE = "deals";
 const string TO_OBJECT_TYPE = "companies";
