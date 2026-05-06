@@ -90,7 +90,7 @@ public type MultiAssociatedObjectWithLabel record {
     # Array of association type specifications with their labels.
     AssociationSpecWithLabel[] associationTypes;
     # The unique identifier for the target object in the association
-    string toObjectId;
+    int|string toObjectId;
 };
 
 # Represents a date and time value with timezone information.

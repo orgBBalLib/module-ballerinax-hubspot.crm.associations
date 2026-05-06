@@ -15,30 +15,24 @@
 // under the License.
 
 import ballerina/io;
-import ballerina/oauth2;
 import ballerinax/hubspot.crm.associations as hsassociations;
 
-configurable string clientId = ?;
-configurable string clientSecret = ?;
-configurable string refreshToken = ?;
+configurable string token = ?;
 
 hsassociations:ConnectionConfig config = {
     auth: {
-        clientId,
-        clientSecret,
-        refreshToken,
-        credentialBearer: oauth2:POST_BODY_BEARER
+        token
     }
 };
 
-final hsassociations:Client hubspot = check new (config);
+final hsassociations:Client hubspot = check new (config, "https://api.hubapi.com/crm/v4");
 
 const string FROM_OBJECT_TYPE = "deals";
 const string TO_OBJECT_TYPE = "companies";
-const string FROM_OBJECT_ID_1 = "46989749974";
-const string TO_OBJECT_ID_1 = "43500581578";
-const string FROM_OBJECT_ID_2 = "46989749975";
-const string TO_OBJECT_ID_2 = "43626089171";
+const string FROM_OBJECT_ID_1 = "323820331760";
+const string TO_OBJECT_ID_1 = "321268435671";
+const string FROM_OBJECT_ID_2 = "323829056186";
+const string TO_OBJECT_ID_2 = "321174871751";
 
 public function main() returns error? {
 
