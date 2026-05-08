@@ -278,7 +278,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Run Gradle build to generate Ballerina files
         id: gradle_build
@@ -306,11 +306,7 @@ jobs:
           # Add version file
           git add gradle.properties
 
-          # Add CHANGELOG.md (case-insensitive, try all variants)
           git add CHANGELOG.md 2>/dev/null || true
-          git add Changelog.md 2>/dev/null || true
-          git add changelog.md 2>/dev/null || true
-          git add ChangeLog.md 2>/dev/null || true
 
           # Verify CHANGELOG.md is staged
           if git diff --staged --name-only | grep -qi "changelog"; then
