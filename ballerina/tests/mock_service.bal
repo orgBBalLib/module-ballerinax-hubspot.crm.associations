@@ -40,40 +40,42 @@ http:Service mockService = service object {
     # http:DefaultStatusCodeResponse (An error occurred.)
     resource function get objects/[string objectType]/[string objectId]/associations/[string toObjectType](string? after, int:Signed32 'limit = 500) returns CollectionResponseMultiAssociatedObjectWithLabelForwardPaging|error {
         if objectType == FROM_OBJECT_TYPE && objectId == FROM_OBJECT_ID && toObjectType == TO_OBJECT_TYPE {
-            return {
-                results: [
-                    {
-                        toObjectId: 38056537805,
-                        associationTypes: [
-                            {
-                                category: "HUBSPOT_DEFINED",
-                                typeId: 5,
-                                label: "Primary"
-                            },
-                            {
-                                category: "HUBSPOT_DEFINED",
-                                typeId: 341,
-                                label: null
-                            }
-                        ]
-                    },
-                    {
-                        toObjectId: 38056537829,
-                        associationTypes: [
-                            {
-                                category: "USER_DEFINED",
-                                typeId: 9,
-                                label: "d->c"
-                            },
-                            {
-                                category: "HUBSPOT_DEFINED",
-                                typeId: 341,
-                                label: null
-                            }
-                        ]
-                    }
-                ]
+            MultiAssociatedObjectWithLabel[] results = [
+                {
+                    toObjectId: "38056537805",
+                    associationTypes: [
+                        {
+                            category: "HUBSPOT_DEFINED",
+                            typeId: 5,
+                            label: "Primary"
+                        },
+                        {
+                            category: "HUBSPOT_DEFINED",
+                            typeId: 341,
+                            label: ()
+                        }
+                    ]
+                },
+                {
+                    toObjectId: "38056537829",
+                    associationTypes: [
+                        {
+                            category: "USER_DEFINED",
+                            typeId: 9,
+                            label: "d->c"
+                        },
+                        {
+                            category: "HUBSPOT_DEFINED",
+                            typeId: 341,
+                            label: ()
+                        }
+                    ]
+                }
+            ];
+            CollectionResponseMultiAssociatedObjectWithLabelForwardPaging response = {
+                results: results
             };
+            return response;
         } else {
             return error("Unable to infer object type from: " + objectType);
         }
@@ -166,50 +168,53 @@ http:Service mockService = service object {
     # http:MultiStatus (multiple statuses)
     # http:DefaultStatusCodeResponse (An error occurred.)
     resource function post associations/[string fromObjectType]/[string toObjectType]/batch/read(@http:Payload BatchInputPublicFetchAssociationsBatchRequest payload) returns BatchResponsePublicAssociationMultiWithLabel|error {
-        return {
-            status: "COMPLETE",
-            results: [
-                {
-                    'from: {
-                        id: "46989749974"
+        MultiAssociatedObjectWithLabel[] toList = [
+            {
+                toObjectId: "43500581578",
+                associationTypes: [
+                    {
+                        category: "HUBSPOT_DEFINED",
+                        typeId: 341,
+                        label: ()
                     },
-                    to: [
-                        {
-                            toObjectId: 43500581578,
-                            associationTypes: [
-                                {
-                                    category: "HUBSPOT_DEFINED",
-                                    typeId: 341,
-                                    label: null
-                                },
-                                {
-                                    category: "HUBSPOT_DEFINED",
-                                    typeId: 5,
-                                    label: "Primary"
-                                }
-                            ]
-                        },
-                        {
-                            toObjectId: 38056537829,
-                            associationTypes: [
-                                {
-                                    category: "HUBSPOT_DEFINED",
-                                    typeId: 341,
-                                    label: null
-                                },
-                                {
-                                    category: "USER_DEFINED",
-                                    typeId: 9,
-                                    label: "d->c"
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ],
+                    {
+                        category: "HUBSPOT_DEFINED",
+                        typeId: 5,
+                        label: "Primary"
+                    }
+                ]
+            },
+            {
+                toObjectId: "38056537829",
+                associationTypes: [
+                    {
+                        category: "HUBSPOT_DEFINED",
+                        typeId: 341,
+                        label: ()
+                    },
+                    {
+                        category: "USER_DEFINED",
+                        typeId: 9,
+                        label: "d->c"
+                    }
+                ]
+            }
+        ];
+        PublicAssociationMultiWithLabel[] results = [
+            {
+                'from: {
+                    id: "46989749974"
+                },
+                to: toList
+            }
+        ];
+        BatchResponsePublicAssociationMultiWithLabel response = {
+            status: "COMPLETE",
+            results: results,
             startedAt: "2025-02-17T11:08:16.755Z",
             completedAt: "2025-02-17T11:08:16.767Z"
         };
+        return response;
     }
 
     # Report
